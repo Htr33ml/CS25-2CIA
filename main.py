@@ -1,12 +1,19 @@
 import streamlit as st
 import pandas as pd
+import os
+import json
+from google.oauth2 import service_account
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 
 # 🔹 Configuração do Google Sheets
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("credenciais.json", scope)
-client = gspread.authorize(creds)
+# Obtenha as credenciais JSON a partir da variável de ambiente
+credentials_info = json.loads(os.environ['GOOGLE_CREDENTIALS_JSON'])
+
+# Crie as credenciais a partir do conteúdo JSON
+credentials = service_account.Credentials.from_service_account_info(credentials_info)
+
+# Autorize o gspread com as credenciais
+client = gspread.authorize(credentials)
 sheet = client.open("Relatório de Conscritos").sheet1  # Nome da sua planilha
 
 # 🔹 Inicializando a lista de conscritos no estado da sessão
