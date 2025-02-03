@@ -20,25 +20,38 @@ users_sheet = client.open("Relatório de Conscritos").worksheet("Usuarios")
 
 # 🔹 Função para hash de senha
 def hash_senha(senha):
-    return hashlib.sha256(senha.encode()).hexdigest()
+    return hashlib.sha256(senha.strip().encode()).hexdigest()
 
 # 🔹 Função para autenticar o usuário e atualizar a senha caso esteja em texto puro
 def autenticar_usuario(usuario, senha):
-    usuarios = users_sheet.get_all_records()
+    usuarios = users_sheet.get_all_values()  # Obtém os valores brutos da planilha
+    
+    if len(usuarios) < 2:  # Se não houver usuários cadastrados
+        return False
 
-    for i, user in enumerate(usuarios):
-        if user['usuario'] == usuario:
-            senha_digitada_hash = hash_senha(senha)
-            
-            # Se a senha no Google Sheets já estiver em hash
-            if user['senha'] == senha_digitada_hash:
-                return True
-            
-            # Se a senha no Google Sheets estiver em texto puro, aceita o login e atualiza o hash
-            if user['senha'] == senha:
-                linha_usuario = i + 2  # Linha no Google Sheets (começa em 2 por causa do cabeçalho)
-                users_sheet.update_cell(linha_usuario, 2, senha_digitada_hash)  # Atualiza a senha na planilha
-                return True
+    df_usuarios = pd.DataFrame(usuarios[1:], columns=usuarios[0])  # Converte para DataFrame
+
+    # Remover espaços extras dos dados
+    df_usuarios = df_usuarios.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+
+    # Verificar se o usuário existe
+    if usuario not in df_usuarios['usuario'].values:
+        return False
+
+    # Pegar a linha do usuário
+    user_row = df_usuarios[df_usuarios['usuario'] == usuario].iloc[0]
+
+    senha_digitada_hash = hash_senha(senha)
+
+    # Se a senha no Google Sheets já estiver em hash
+    if user_row['senha'] == senha_digitada_hash:
+        return True
+
+    # Se a senha no Google Sheets estiver em texto puro, aceita o login e atualiza o hash
+    if user_row['senha'] == senha:
+        linha_usuario = df_usuarios.index[df_usuarios['usuario'] == usuario][0] + 2  # Ajustar para a linha correta no Google Sheets
+        users_sheet.update_cell(linha_usuario, 2, senha_digitada_hash)  # Atualiza a senha na planilha
+        return True
 
     return False
 
