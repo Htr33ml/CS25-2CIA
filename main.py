@@ -22,21 +22,22 @@ users_sheet = client.open("Relatório de Conscritos").worksheet("Usuarios")
 def hash_senha(senha):
     return hashlib.sha256(senha.encode()).hexdigest()
 
-# 🔹 Função para verificar credenciais e converter senhas em texto puro
+# 🔹 Função para autenticar o usuário e atualizar a senha caso esteja em texto puro
 def autenticar_usuario(usuario, senha):
     usuarios = users_sheet.get_all_records()
-    
+
     for i, user in enumerate(usuarios):
         if user['usuario'] == usuario:
             senha_digitada_hash = hash_senha(senha)
             
-            # Se a senha armazenada for a senha em texto puro, convertê-la em hash
-            if user['senha'] == senha:
-                users_sheet.update_cell(i+2, 2, senha_digitada_hash)  # Atualiza a senha na planilha
+            # Se a senha no Google Sheets já estiver em hash
+            if user['senha'] == senha_digitada_hash:
                 return True
             
-            # Se já estiver em hash, comparar normalmente
-            if user['senha'] == senha_digitada_hash:
+            # Se a senha no Google Sheets estiver em texto puro, aceita o login e atualiza o hash
+            if user['senha'] == senha:
+                linha_usuario = i + 2  # Linha no Google Sheets (começa em 2 por causa do cabeçalho)
+                users_sheet.update_cell(linha_usuario, 2, senha_digitada_hash)  # Atualiza a senha na planilha
                 return True
 
     return False
