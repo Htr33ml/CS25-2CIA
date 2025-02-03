@@ -24,9 +24,9 @@ def hash_senha(senha):
 
 # 🔹 Função para autenticar o usuário e atualizar a senha caso esteja em texto puro
 def autenticar_usuario(usuario, senha):
-    usuarios = users_sheet.get_all_values()  # Obtém os valores brutos da planilha
-    
-    if len(usuarios) < 2:  # Se não houver usuários cadastrados
+    usuarios = users_sheet.get_all_values()  
+
+    if len(usuarios) < 2:  # Se a planilha estiver vazia
         return False
 
     df_usuarios = pd.DataFrame(usuarios[1:], columns=usuarios[0])  # Converte para DataFrame
@@ -69,7 +69,7 @@ def login():
             data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             users_sheet.append_row([usuario, data_hora])
             st.success(f"Bem-vindo, {usuario}!")
-            st.experimental_rerun()
+            st.rerun()  # 🔹 Substituímos st.experimental_rerun() por st.rerun()
         else:
             st.error("Usuário ou senha incorretos. Tente novamente.")
 
