@@ -3,20 +3,33 @@ import pandas as pd
 import gspread
 import json
 import os
+import sys
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 import hashlib
 
+# Verificar se Streamlit está instalado
+try:
+    import streamlit as st
+except ModuleNotFoundError:
+    sys.exit("Erro: O módulo 'streamlit' não está instalado. Execute 'pip install streamlit' para instalá-lo.")
+
 # 🔹 Configuração do Google Sheets
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 creds_json = os.getenv('GOOGLE_SHEET_CREDENTIALS_JSON')
+if not creds_json:
+    sys.exit("Erro: A variável de ambiente 'GOOGLE_SHEET_CREDENTIALS_JSON' não está definida.")
+
 creds_dict = json.loads(creds_json)
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
 # 🔹 Acessando planilhas
-sheet = client.open("Relatório de Conscritos").sheet1
-users_sheet = client.open("Relatório de Conscritos").worksheet("Usuarios")
+try:
+    sheet = client.open("Relatório de Conscritos").sheet1
+    users_sheet = client.open("Relatório de Conscritos").worksheet("Usuarios")
+except gspread.exceptions.SpreadsheetNotFound:
+    sys.exit("Erro: Planilha 'Relatório de Conscritos' não encontrada. Verifique se o nome está correto.")
 
 # 🔹 Função para hash de senha
 def hash_senha(senha):
@@ -24,44 +37,28 @@ def hash_senha(senha):
 
 # 🔹 Função para autenticar o usuário e atualizar a senha caso esteja em texto puro
 def autenticar_usuario(usuario, senha):
-    usuarios = users_sheet.get_all_values()  
-
-    if len(usuarios) < 2:  # Se a planilha estiver vazia
+    usuarios = users_sheet.get_all_values()
+    if len(usuarios) < 2:
         return False
-
-    df_usuarios = pd.DataFrame(usuarios[1:], columns=usuarios[0])  # Converte para DataFrame
-
-    # Remover espaços extras dos dados
+    df_usuarios = pd.DataFrame(usuarios[1:], columns=usuarios[0])
     df_usuarios = df_usuarios.applymap(lambda x: x.strip() if isinstance(x, str) else x)
-
-    # Verificar se o usuário existe
     if usuario not in df_usuarios['usuario'].values:
         return False
-
-    # Pegar a linha do usuário
     user_row = df_usuarios[df_usuarios['usuario'] == usuario].iloc[0]
-
     senha_digitada_hash = hash_senha(senha)
-
-    # Se a senha no Google Sheets já estiver em hash
     if user_row['senha'] == senha_digitada_hash:
         return True
-
-    # Se a senha no Google Sheets estiver em texto puro, aceita o login e atualiza o hash
     if user_row['senha'] == senha:
-        linha_usuario = df_usuarios.index[df_usuarios['usuario'] == usuario][0] + 2  # Ajustar para a linha correta no Google Sheets
-        users_sheet.update_cell(linha_usuario, 2, senha_digitada_hash)  # Atualiza a senha na planilha
+        linha_usuario = df_usuarios.index[df_usuarios['usuario'] == usuario][0] + 2
+        users_sheet.update_cell(linha_usuario, 2, senha_digitada_hash)
         return True
-
     return False
 
 # 🔹 Tela de Login
 def login():
     st.title("Login - Seleção Complementar 2025")
-    
     usuario = st.text_input("Usuário:")
     senha = st.text_input("Senha:", type="password")
-    
     if st.button("Entrar"):
         if autenticar_usuario(usuario, senha):
             st.session_state['usuario'] = usuario
@@ -69,79 +66,40 @@ def login():
             data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             users_sheet.append_row([usuario, data_hora])
             st.success(f"Bem-vindo, {usuario}!")
-            st.rerun()  # 🔹 Substituímos st.experimental_rerun() por st.rerun()
+            st.rerun()
         else:
             st.error("Usuário ou senha incorretos. Tente novamente.")
 
-# 🔹 Tela Principal (após login)
-def main_app():
-    st.title("Seleção Complementar 2025 - 2ª CIA TIGRE")
-
-    # 🔹 Inicializando lista de conscritos
-    if "conscritos" not in st.session_state:
-        st.session_state.conscritos = []
-
-    # 🔹 Peso para menções
-    peso_mencao = {
-        "Excelente": 10,
-        "Muito Bom": 8,
-        "Bom": 6,
-        "Regular": 4,
-        "Insuficiente": 0
+# 🔹 Interface Streamlit
+st.markdown("""
+    <style>
+    .reportview-container {
+        background-color: black;
+        color: white;
     }
+    h1, h2, h3, h4, h5, h6 {
+        color: white;
+    }
+    .css-ffhzg2 { 
+        color: white;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-    # 🔹 Função para coletar dados dos conscritos
-    def coletar_dados():
-        st.subheader("Cadastro de Conscritos")
-        nome = st.text_input("Nome do conscrito:")
-        if not nome:
-            st.warning("Por favor, preencha o nome do conscrito.")
-            return
+st.image('IMG_1118.png', width=60, use_container_width=True)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            obeso = st.radio("É obeso?", ("Sim", "Não"))
-            passou_saude = st.radio("Passou na saúde?", ("Sim", "Não"))
-            passou_teste_fisico = st.radio("Passou no teste físico?", ("Sim", "Não"))
-            menção = st.selectbox("Menção na entrevista:", ["Excelente", "Muito Bom", "Bom", "Regular", "Insuficiente"])
-            contra_indicado = st.radio("É contra indicado?", ("Sim", "Não"))
+st.markdown('<h1 style="text-align: center; font-size: 40px; margin-bottom: 5px;">SELEÇÃO COMPLEMENTAR 2025</h1>', unsafe_allow_html=True)
+st.markdown('<h2 style="text-align: center; margin-top: 0px; margin-bottom: 30px;">2ª CIA - TIGRE</h2>', unsafe_allow_html=True)
 
-        with col2:
-            apto_instrucao = st.radio("Apto pela equipe de instrução?", ("Sim", "Não"))
-            habilidades = st.number_input("Habilidades (quantidade):", min_value=0, max_value=10)
-            habilidades_descricao = st.text_area("Quais habilidades? (Descreva)")
-
-        # Verificação de reprovação
-        status = "Apto"
-        if obeso == "Sim":
-            status = "Inapto - Obesidade"
-        elif passou_saude == "Não":
-            status = "Inapto - Saúde"
-        elif passou_teste_fisico == "Não":
-            status = "Inapto - Teste Físico"
-        elif contra_indicado == "Sim":
-            status = "Inapto - Contraindicado"
-        elif apto_instrucao == "Não":
-            status = "Inapto - Não Apto pela Instrução"
-
-        habilidades_str = str(habilidades) if habilidades > 0 else "-"
-        habilidades_descricao = habilidades_descricao if habilidades > 0 else "-"
-
-        conscritos_existentes = [c[1] for c in st.session_state.conscritos]
-        if nome in conscritos_existentes:
-            st.warning(f"O conscrito {nome} já foi registrado.")
-            return
-
-        gravar = st.button("🦅Gravar🦅")
-        if gravar:
-            sheet.append_row([nome, menção, habilidades_str, habilidades_descricao, peso_mencao[menção], status])
-            st.session_state.conscritos.append((nome, menção, habilidades_str, habilidades_descricao, peso_mencao[menção], status))
-            st.success(f"✅ Dados de {nome} salvos com sucesso!")
-
-    coletar_dados()
-
-# 🔹 Executar Login antes do app principal
 if "logado" not in st.session_state or not st.session_state["logado"]:
     login()
 else:
-    main_app()
+    coletar_dados()
+    exibir_conscritos()
+    st.subheader("Gerar Relatório")
+    st.download_button(label="Baixar Relatório (1º Pelotão)", data=gerar_relatorio_pelotao(1), file_name="relatorio_1pelotao.csv", mime="text/csv")
+    st.download_button(label="Baixar Relatório (2º Pelotão)", data=gerar_relatorio_pelotao(2), file_name="relatorio_2pelotao.csv", mime="text/csv")
+    st.markdown("""
+        <p style="font-size: 10px; color: white; text-align: center;">Código Python feito por CAP TREMMEL - PQDT 90.360</p>
+        <p style="font-size: 10px; color: white; text-align: center;">Qualquer erro, entre em contato: 21 974407682</p>
+    """, unsafe_allow_html=True)
