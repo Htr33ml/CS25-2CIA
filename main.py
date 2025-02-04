@@ -54,7 +54,7 @@ def autenticar_usuario(usuario, senha):
     if user_row['senha'] == senha_digitada_hash:
         return True
     if user_row['senha'] == senha:
-        # Atualiza a senha para hash, se estiver armazenada em texto puro
+        # Atualiza a senha para hash, se armazenada em texto puro
         linha_usuario = df_usuarios.index[df_usuarios['usuario'] == usuario][0] + 2
         users_sheet.update_cell(linha_usuario, 2, senha_digitada_hash)
         return True
@@ -68,169 +68,198 @@ def login():
         if autenticar_usuario(usuario, senha):
             st.session_state['usuario'] = usuario
             st.session_state['logado'] = True
-            # Obtém a data/hora conforme o horário de Brasília
             data_hora = datetime.now(brasilia_tz).strftime("%Y-%m-%d %H:%M:%S")
-            # Registra o login na aba "Logins"
             logins_sheet.append_row([usuario, data_hora])
             st.success(f"Bem-vindo, {usuario}!")
             st.rerun()
         else:
             st.error("Usuário ou senha incorretos. Tente novamente.")
 
-# ------------------------------
-# CHECAGEM DE LOGIN
-# ------------------------------
 if "logado" not in st.session_state or not st.session_state["logado"]:
     login()
     st.stop()
 
 # ------------------------------
-# VARIÁVEIS GLOBAIS
+# FUNÇÃO PARA CALCULAR A SITUAÇÃO FINAL
 # ------------------------------
-# Caso queira usar a lista de conscritos na sessão (opcional)
-if "conscritos" not in st.session_state:
-    st.session_state.conscritos = []
+def compute_situacao(row):
+    # row: dicionário com chaves iguais aos nomes das colunas da planilha
+    if row["Saúde_Apto"].strip().lower() == "não":
+        return "Inapto"
+    if row["TAF"].strip().lower() == "não":
+        return "Inapto"
+    # Na entrevista, se a menção for "Insuficiente" (nota 2) → eliminatório
+    if row["Entrevista_Menção"].strip().lower() == "insuficiente":
+        return "Inapto"
+    if row["2ª Seção"].strip().lower() == "sim":
+        return "Inapto"
+    if row["Instrução_Apto"].strip().lower() == "não":
+        return "Inapto"
+    if row["Obeso"].strip().lower() == "sim":
+        return "Inapto"
+    return "Apto"
 
-# Dicionário com o peso da menção (usado para cálculo automático)
-peso_mencao = {
+# Dicionário para o peso da entrevista
+interview_weights = {
     "Excelente": 10,
     "Muito Bom": 8,
     "Bom": 6,
     "Regular": 4,
-    "Insuficiente": 0
+    "Insuficiente": 2
 }
 
 # ------------------------------
-# PÁGINA DE CADASTRO (INSERÇÃO)
+# MENU LATERAL: Atualizar Conscrito / Relatórios
 # ------------------------------
-def cadastro_page():
-    st.header("Cadastro de Conscritos")
+menu_option = st.sidebar.radio("Menu", ["Atualizar Conscrito", "Relatórios"])
+
+if menu_option == "Atualizar Conscrito":
+    st.sidebar.markdown("### Selecione o conscrito")
+    all_values = sheet.get_all_values()
+    if len(all_values) < 2:
+        st.info("Nenhum conscrito cadastrado.")
+        st.stop()
+    header = all_values[0]
+    data = all_values[1:]
+    # Considera que a coluna A é o Nome
+    names = [row[0] for row in data]
+    search_name = st.sidebar.text_input("Pesquisar conscrito:")
+    if search_name:
+        filtered_names = [name for name in names if search_name.lower() in name.lower()]
+    else:
+        filtered_names = names
+    if filtered_names:
+        selected_name = st.sidebar.selectbox("Selecione o conscrito:", filtered_names)
+    else:
+        st.sidebar.info("Nenhum conscrito encontrado.")
+        st.stop()
+    # Localiza a linha do conscrito selecionado (contando o cabeçalho)
+    row_num = None
+    for i, row in enumerate(data):
+        if row[0] == selected_name:
+            row_num = i + 2  # +2: uma para o cabeçalho, e i é indexado em 0
+            break
+    if row_num is None:
+        st.error("Conscrito não encontrado.")
+        st.stop()
+
+    st.header(f"Atualizando informações do conscrito: {selected_name}")
+    # Cria abas (tabs) para cada área de atualização
+    tab_names = ["Saúde", "Teste de Aptidão Física", "Entrevista", "2ª Seção", "Equipe de Instrução"]
+    tabs = st.tabs(tab_names)
+
+    # Aba Saúde
+    with tabs[0]:
+        st.subheader("Saúde")
+        saude_apto = st.radio("Está apto pela seção de saúde?", ("Sim", "Não"))
+        saude_motivo = ""
+        if saude_apto == "Não":
+            saude_motivo = st.text_input("Qual o motivo?")
+        if st.button("Salvar Saúde", key="salvar_saude"):
+            # Atualiza colunas B e C (Saúde_Apto e Saúde_Motivo)
+            sheet.update(f"B{row_num}:C{row_num}", [[saude_apto, saude_motivo]])
+            st.success("Dados de Saúde atualizados.")
+
+    # Aba TAF
+    with tabs[1]:
+        st.subheader("Teste de Aptidão Física (TAF)")
+        taf = st.radio("Passou no TAF?", ("Sim", "Não"))
+        if st.button("Salvar TAF", key="salvar_taf"):
+            # Atualiza a coluna D (TAF)
+            sheet.update(f"D{row_num}", taf)
+            st.success("Dados do TAF atualizados.")
+
+    # Aba Entrevista
+    with tabs[2]:
+        st.subheader("Entrevista")
+        entrevista_mencao = st.selectbox("Menção", ["Excelente", "Muito Bom", "Bom", "Regular", "Insuficiente"])
+        entrevista_obs = st.text_area("Observações do entrevistador")
+        if st.button("Salvar Entrevista", key="salvar_entrevista"):
+            # Atualiza as colunas E e F (Entrevista_Menção e Entrevista_Obs)
+            sheet.update(f"E{row_num}:F{row_num}", [[entrevista_mencao, entrevista_obs]])
+            st.success("Dados da Entrevista atualizados.")
+
+    # Aba 2ª Seção
+    with tabs[3]:
+        st.subheader("2ª Seção")
+        segunda_secao = st.radio("É contra indicado?", ("Sim", "Não"))
+        if st.button("Salvar 2ª Seção", key="salvar_2secao"):
+            # Atualiza a coluna G (2ª Seção)
+            sheet.update(f"G{row_num}", segunda_secao)
+            st.success("Dados da 2ª Seção atualizados.")
+
+    # Aba Equipe de Instrução
+    with tabs[4]:
+        st.subheader("Equipe de Instrução")
+        instrucao_apto = st.radio("É apto pela equipe de instrução?", ("Sim", "Não"))
+        obeso = st.radio("É obeso?", ("Sim", "Não"))
+        if st.button("Salvar Equipe de Instrução", key="salvar_instrucao"):
+            # Atualiza as colunas H e I (Instrução_Apto e Obeso)
+            sheet.update(f"H{row_num}:I{row_num}", [[instrucao_apto, obeso]])
+            st.success("Dados da Equipe de Instrução atualizados.")
+
+elif menu_option == "Relatórios":
+    st.header("Relatórios")
+    # Função para gerar relatório em CSV com cálculo da situação e ordenação por entrevista
+    def gerar_relatorio_pelotao(pelotao):
+        all_values = sheet.get_all_values()
+        if len(all_values) < 2:
+            st.info("Nenhum conscrito cadastrado.")
+            return None
+        headers = all_values[0]
+        data = all_values[1:]
+        df = pd.DataFrame(data, columns=headers)
+        # Espera que as colunas existam com estes nomes:
+        # "Nome", "Saúde_Apto", "Saúde_Motivo", "TAF", "Entrevista_Menção", "Entrevista_Obs", "2ª Seção", "Instrução_Apto", "Obeso"
+        df["Situação Calculada"] = df.apply(compute_situacao, axis=1)
+        df["Entrevista Peso"] = df["Entrevista_Menção"].apply(lambda x: interview_weights.get(x.strip(), 0))
+        # Ordena pela nota da entrevista (descendente)
+        df = df.sort_values(by="Entrevista Peso", ascending=False)
+        # Filtra por pelotão: aqui, por exemplo, pelotão 1 = nomes iniciados com A–E, pelotão 2 = nomes iniciados com F–J
+        if pelotao == 1:
+            df_filtrado = df[df["Nome"].str[0].str.upper().isin(list("ABCDE"))]
+        else:
+            df_filtrado = df[df["Nome"].str[0].str.upper().isin(list("FGHIJ"))]
+        return df_filtrado.to_csv(index=False).encode('utf-8')
     
-    st.markdown("### Cadastro Individual")
-    with st.form("form_cadastro_individual"):
-        nome = st.text_input("Nome do conscrito:")
-        menção = st.selectbox("Menção na entrevista:", ["Excelente", "Muito Bom", "Bom", "Regular", "Insuficiente"])
-        habilidades = st.number_input("Habilidades (quantidade):", min_value=0, max_value=10, step=1)
-        habilidades_descricao = st.text_area("Quais habilidades? (Descreva)")
-        status = st.selectbox("Situação:", [
-            "Apto", 
-            "Inapto - Obesidade", 
-            "Inapto - Saúde", 
-            "Inapto - Teste Físico", 
-            "Inapto - Contraindicado", 
-            "Inapto - Não Apto"
-        ])
-        submitted = st.form_submit_button("Cadastrar Conscrito")
-        if submitted:
-            if not nome:
-                st.warning("Preencha o nome do conscrito!")
-            else:
-                peso = peso_mencao.get(menção, 0)
-                sheet.append_row([
-                    nome, 
-                    menção, 
-                    str(habilidades) if habilidades > 0 else "-", 
-                    habilidades_descricao if habilidades > 0 else "-", 
-                    peso, 
-                    status
-                ])
-                st.success(f"Conscrito {nome} cadastrado com sucesso!")
-    
-    st.markdown("---")
-    st.markdown("### Cadastro em Lote (CSV)")
-    file = st.file_uploader("Carregar arquivo CSV", type=["csv"])
-    if file is not None:
-        try:
-            df = pd.read_csv(file)
-            # Verifica se as colunas necessárias existem
-            colunas_esperadas = {"Nome", "Menção", "Habilidades", "Quais Habilidades", "Situação"}
-            if not colunas_esperadas.issubset(set(df.columns)):
-                st.error("O arquivo CSV não possui as colunas necessárias. Verifique se contém: Nome, Menção, Habilidades, Quais Habilidades, Situação.")
-            else:
-                cont = 0
-                for _, row in df.iterrows():
-                    nome = row["Nome"]
-                    menção = row["Menção"]
-                    habilidades = row["Habilidades"]
-                    habilidades_descricao = row["Quais Habilidades"]
-                    status = row["Situação"]
-                    peso = peso_mencao.get(menção, 0)
-                    sheet.append_row([
-                        nome, 
-                        menção, 
-                        str(habilidades) if pd.notna(habilidades) and habilidades > 0 else "-", 
-                        habilidades_descricao if pd.notna(habilidades_descricao) else "-", 
-                        peso, 
-                        status
-                    ])
-                    cont += 1
-                st.success(f"{cont} conscritos cadastrados com sucesso!")
-        except Exception as e:
-            st.error(f"Erro ao processar o arquivo: {e}")
+    tab_rel = st.tabs(["Relatório 1º Pelotão", "Relatório 2º Pelotão"])
+    with tab_rel[0]:
+        st.subheader("Relatório 1º Pelotão")
+        csv1 = gerar_relatorio_pelotao(1)
+        if csv1:
+            st.download_button(label="Baixar CSV 1º Pelotão", data=csv1, file_name="relatorio_1pelotao.csv", mime="text/csv")
+    with tab_rel[1]:
+        st.subheader("Relatório 2º Pelotão")
+        csv2 = gerar_relatorio_pelotao(2)
+        if csv2:
+            st.download_button(label="Baixar CSV 2º Pelotão", data=csv2, file_name="relatorio_2pelotao.csv", mime="text/csv")
 
 # ------------------------------
-# PÁGINA DE ADMINISTRAÇÃO (EDIÇÃO)
+# EXIBIÇÃO GERAL DOS CONSCRITOS (com situação colorida)
 # ------------------------------
-def administracao_page():
-    st.header("Painel Administrativo de Conscritos")
-    data = sheet.get_all_values()
-    if len(data) <= 1:
+def exibir_conscritose_status():
+    all_values = sheet.get_all_values()
+    if len(all_values) < 2:
         st.info("Nenhum conscrito cadastrado.")
         return
-    # Cria um DataFrame a partir dos dados (pulando o cabeçalho)
-    df = pd.DataFrame(data[1:], columns=data[0])
-    # Cria uma lista de opções para selecionar o conscrito (exibindo o número da linha e o nome)
-    options = [f"{i+2} - {row['Nome']}" for i, row in df.iterrows()]
-    selected = st.selectbox("Selecione o conscrito para editar:", options)
-    # Obtém o número da linha no Google Sheets (considerando que a linha 1 é o cabeçalho)
-    row_num = int(selected.split(" - ")[0])
-    # Como o DataFrame df foi criado a partir de data[1:], o índice do conscrito é (row_num - 2)
-    row_data = df.iloc[row_num - 2]
-    
-    st.markdown("### Editar Conscrito")
-    with st.form("form_edicao"):
-        novo_nome = st.text_input("Nome", value=row_data["Nome"])
-        novo_menção = st.selectbox("Menção", ["Excelente", "Muito Bom", "Bom", "Regular", "Insuficiente"], 
-                                   index=["Excelente", "Muito Bom", "Bom", "Regular", "Insuficiente"].index(row_data["Menção"]))
-        # Tenta converter o valor atual de habilidades para inteiro (se possível)
-        try:
-            current_habilidades = int(row_data["Habilidades"]) if row_data["Habilidades"].isdigit() else 0
-        except Exception:
-            current_habilidades = 0
-        novo_habilidades = st.number_input("Habilidades (quantidade)", min_value=0, max_value=10, step=1, value=current_habilidades)
-        novo_hab_desc = st.text_area("Quais Habilidades", value=row_data["Quais Habilidades"])
-        novo_status = st.selectbox("Situação", [
-            "Apto", 
-            "Inapto - Obesidade", 
-            "Inapto - Saúde", 
-            "Inapto - Teste Físico", 
-            "Inapto - Contraindicado", 
-            "Inapto - Não Apto"
-        ], index=["Apto", "Inapto - Obesidade", "Inapto - Saúde", "Inapto - Teste Físico", "Inapto - Contraindicado", "Inapto - Não Apto"].index(row_data["Situação"]))
-        submit_edicao = st.form_submit_button("Salvar Alterações")
-        if submit_edicao:
-            novo_peso = peso_mencao.get(novo_menção, 0)
-            # Atualiza a linha correspondente na planilha (colunas A a F)
-            new_values = [[novo_nome, novo_menção, str(novo_habilidades) if novo_habilidades > 0 else "-", 
-                           novo_hab_desc if novo_hab_desc else "-", novo_peso, novo_status]]
-            sheet.update(f"A{row_num}:F{row_num}", new_values)
-            st.success("Registro atualizado com sucesso!")
-            st.experimental_rerun()
+    headers = all_values[0]
+    data = all_values[1:]
+    df = pd.DataFrame(data, columns=headers)
+    df["Situação Calculada"] = df.apply(compute_situacao, axis=1)
+    df["Entrevista Peso"] = df["Entrevista_Menção"].apply(lambda x: interview_weights.get(x.strip(), 0))
+    df = df.sort_values(by="Entrevista Peso", ascending=False)
+    # Função para colorir a coluna Situação Calculada: vermelho se Inapto, verde se Apto
+    def color_sit(value):
+        if value == "Inapto":
+            return "background-color: red; color: white;"
+        else:
+            return "background-color: lightgreen; color: black;"
+    styled_df = df.style.applymap(color_sit, subset=["Situação Calculada"])
+    st.dataframe(styled_df)
 
-    st.markdown("---")
-    st.markdown("### Visualização Completa dos Conscritos")
-    st.dataframe(df)
-
-# ------------------------------
-# INTERFACE PRINCIPAL: BARRA LATERAL
-# ------------------------------
-st.sidebar.title("Menu Administrativo")
-modo = st.sidebar.radio("Selecione a opção desejada:", ["Cadastro", "Administração"])
-
-if modo == "Cadastro":
-    cadastro_page()
-else:
-    administracao_page()
+st.markdown("---")
+st.subheader("Visualização Completa dos Conscritos")
+exibir_conscritose_status()
 
 # ------------------------------
 # CUSTOMIZAÇÃO VISUAL E CRÉDITOS
@@ -253,7 +282,6 @@ st.markdown("""
 st.image('IMG_1118.png', width=60, use_container_width=True)
 st.markdown('<h1 style="text-align: center; font-size: 40px; margin-bottom: 5px;">SELEÇÃO COMPLEMENTAR 2025</h1>', unsafe_allow_html=True)
 st.markdown('<h2 style="text-align: center; margin-top: 0px; margin-bottom: 30px;">2ª CIA - TIGRE</h2>', unsafe_allow_html=True)
-
 st.markdown("""
     <p style="font-size: 10px; color: white; text-align: center;">
     Código Python feito por CAP TREMMEL - PQDT 90.360 | Qualquer erro, entre em contato: 21 974407682
