@@ -94,27 +94,6 @@ def conv(x):
     return 1 if x.strip().lower() == "sim" else 0
 
 # ------------------------------
-# FUNÇÃO PARA CALCULAR A SITUAÇÃO FINAL
-# ------------------------------
-def compute_situacao(row):
-    contraindicado = row.get("Contraindicado?")
-    if contraindicado is None:
-        contraindicado = row.get("2ª Seção", "")
-    if row["Saúde_Apto"].strip().lower() == "não":
-        return "Inapto"
-    if row["TAF"].strip().lower() == "não":
-        return "Inapto"
-    if row["Entrevista_Menção"].strip().lower() == "insuficiente":
-        return "Inapto"
-    if contraindicado.strip().lower() == "sim":
-        return "Inapto"
-    if row["Instrução_Apto"].strip().lower() == "não":
-        return "Inapto"
-    if row["Obeso"].strip().lower() == "sim":
-        return "Inapto"
-    return "Apto"
-
-# ------------------------------
 # DEFINIÇÃO DO PESO DA ENTREVISTA
 # ------------------------------
 interview_weights = {
@@ -139,6 +118,27 @@ def compute_ml_score(row):
     return score
 
 # ------------------------------
+# FUNÇÃO PARA CALCULAR A SITUAÇÃO FINAL
+# ------------------------------
+def compute_situacao(row):
+    contraindicado = row.get("Contraindicado?")
+    if contraindicado is None:
+        contraindicado = row.get("2ª Seção", "")
+    if row["Saúde_Apto"].strip().lower() == "não":
+        return "Inapto"
+    if row["TAF"].strip().lower() == "não":
+        return "Inapto"
+    if row["Entrevista_Menção"].strip().lower() == "insuficiente":
+        return "Inapto"
+    if contraindicado.strip().lower() == "sim":
+        return "Inapto"
+    if row["Instrução_Apto"].strip().lower() == "não":
+        return "Inapto"
+    if row["Obeso"].strip().lower() == "sim":
+        return "Inapto"
+    return "Apto"
+
+# ------------------------------
 # FUNÇÃO PARA REORDENAR E RENOMEAR COLUNAS (EXIBIÇÃO)
 # ------------------------------
 def reordenar_e_renomear(df):
@@ -152,12 +152,13 @@ def reordenar_e_renomear(df):
     return df
 
 # ------------------------------
-# FUNÇÃO PARA ORDENAR E NUMERAR REGISTROS
+# FUNÇÃO PARA ORDENAR E NUMERAR REGISTROS (REMOVENDO ML SCORE AO FINAL)
 # ------------------------------
 def ordenar_e_numerar(df):
     df["sit_status"] = df["Situação Calculada"].map({"Apto": 0, "Inapto": 1})
     df = df.sort_values(by=["sit_status", "ML Score"], ascending=[True, False])
-    df = df.drop(columns=["sit_status"])
+    # Remove as colunas auxiliares antes de exibir:
+    df = df.drop(columns=["ML Score", "sit_status"])
     df = df.reset_index(drop=True)
     df.insert(0, "Ordem", df.index + 1)
     return df
