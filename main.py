@@ -54,6 +54,22 @@ def autenticar_usuario(usuario, senha):
         return True
     return False
 
+# 🔹 Função para exibir tela de login
+def login():
+    st.title("Login - Seleção Complementar 2025")
+    usuario = st.text_input("Usuário:")
+    senha = st.text_input("Senha:", type="password")
+    if st.button("Entrar"):
+        if autenticar_usuario(usuario, senha):
+            st.session_state['usuario'] = usuario
+            st.session_state['logado'] = True
+            data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            users_sheet.append_row([usuario, data_hora])
+            st.success(f"Bem-vindo, {usuario}!")
+            st.rerun()
+        else:
+            st.error("Usuário ou senha incorretos. Tente novamente.")
+
 # 🔹 Função para coletar dados de cada conscrito
 def coletar_dados():
     st.subheader("Cadastro de Conscritos")
