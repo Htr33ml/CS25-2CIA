@@ -54,21 +54,17 @@ def autenticar_usuario(usuario, senha):
         return True
     return False
 
-# 🔹 Tela de Login
-def login():
-    st.title("Login - Seleção Complementar 2025")
-    usuario = st.text_input("Usuário:")
-    senha = st.text_input("Senha:", type="password")
-    if st.button("Entrar"):
-        if autenticar_usuario(usuario, senha):
-            st.session_state['usuario'] = usuario
-            st.session_state['logado'] = True
-            data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            users_sheet.append_row([usuario, data_hora])
-            st.success(f"Bem-vindo, {usuario}!")
-            st.rerun()
-        else:
-            st.error("Usuário ou senha incorretos. Tente novamente.")
+# 🔹 Função para coletar dados de cada conscrito
+def coletar_dados():
+    st.subheader("Cadastro de Conscritos")
+    nome = st.text_input("Nome do conscrito:")
+    if st.button("Gravar"):
+        st.success(f"✅ Dados de {nome} salvos com sucesso!")
+
+# 🔹 Função para exibir conscritos
+def exibir_conscritos():
+    st.subheader("Lista de Conscritos")
+    st.write("Aqui estarão listados os conscritos cadastrados.")
 
 # 🔹 Interface Streamlit
 st.markdown("""
@@ -97,8 +93,8 @@ else:
     coletar_dados()
     exibir_conscritos()
     st.subheader("Gerar Relatório")
-    st.download_button(label="Baixar Relatório (1º Pelotão)", data=gerar_relatorio_pelotao(1), file_name="relatorio_1pelotao.csv", mime="text/csv")
-    st.download_button(label="Baixar Relatório (2º Pelotão)", data=gerar_relatorio_pelotao(2), file_name="relatorio_2pelotao.csv", mime="text/csv")
+    st.download_button(label="Baixar Relatório (1º Pelotão)", data="", file_name="relatorio_1pelotao.csv", mime="text/csv")
+    st.download_button(label="Baixar Relatório (2º Pelotão)", data="", file_name="relatorio_2pelotao.csv", mime="text/csv")
     st.markdown("""
         <p style="font-size: 10px; color: white; text-align: center;">Código Python feito por CAP TREMMEL - PQDT 90.360</p>
         <p style="font-size: 10px; color: white; text-align: center;">Qualquer erro, entre em contato: 21 974407682</p>
