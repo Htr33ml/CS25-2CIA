@@ -7,6 +7,10 @@ import sys
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 import hashlib
+from pytz import timezone  # Importa o módulo pytz para trabalhar com fusos horários
+
+# Define o fuso horário de Brasília
+brasilia_tz = timezone('America/Sao_Paulo')
 
 # 🔹 Configuração do Google Sheets usando a variável de ambiente para as credenciais
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -15,7 +19,7 @@ creds_json = os.getenv('GOOGLE_SHEET_CREDENTIALS_JSON')
 if not creds_json:
     sys.exit("Erro: A variável de ambiente 'GOOGLE_SHEET_CREDENTIALS_JSON' não está definida.")
 
-creds_dict = json.loads(creds_json)  # Carregar como dicionário JSON
+creds_dict = json.loads(creds_json)  # Carrega as credenciais como dicionário JSON
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
@@ -24,6 +28,11 @@ client = gspread.authorize(creds)
 sheet = client.open("Relatório de Conscritos").sheet1
 # Planilha com os usuários para login (aba "Usuarios")
 users_sheet = client.open("Relatório de Conscritos").worksheet("Usuarios")
+# Planilha para registrar logins (aba "Logins")
+try:
+    logins_sheet = client.open("Relatório de Conscritos").worksheet("Logins")
+except gspread.exceptions.WorksheetNotFound:
+    sys.exit("Erro: A aba 'Logins' não foi encontrada. Crie-a na planilha.")
 
 # 🔹 Funções de autenticação e login
 
@@ -57,10 +66,12 @@ def login():
         if autenticar_usuario(usuario, senha):
             st.session_state['usuario'] = usuario
             st.session_state['logado'] = True
-            data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            users_sheet.append_row([usuario, data_hora])
+            # Obtém a data/hora de acordo com o horário de Brasília
+            data_hora = datetime.now(brasilia_tz).strftime("%Y-%m-%d %H:%M:%S")
+            # Registra o login na aba "Logins"
+            logins_sheet.append_row([usuario, data_hora])
             st.success(f"Bem-vindo, {usuario}!")
-            st.rerun()  # Substituído st.experimental_rerun() por st.rerun()
+            st.rerun()
         else:
             st.error("Usuário ou senha incorretos. Tente novamente.")
 
@@ -128,20 +139,18 @@ def coletar_dados():
 
     # Criar botão "Gravar"
     gravar = st.button("🦅Gravar🦅")
-
     if gravar:
-        # Salvar no Google Sheets com 6 colunas
+        # Salva os dados no Google Sheets com 6 colunas
         sheet.append_row([nome, menção, habilidades_str, habilidades_descricao, peso_mencao[menção], status])
-        # Atualizar a lista de conscritos na sessão
+        # Atualiza a lista de conscritos na sessão
         st.session_state.conscritos.append((nome, menção, habilidades_str, habilidades_descricao, peso_mencao[menção], status))
         st.success(f"✅ Dados de {nome} salvos com sucesso!")
 
 # 🔹 Função para exibir os conscritos organizados por pelotão
 def exibir_conscritos():
-    # Buscar os dados salvos no Google Sheets (ignorando cabeçalho)
+    # Busca os dados salvos no Google Sheets (ignorando o cabeçalho)
     conscritos = sheet.get_all_values()[1:]
-
-    # Ordenar conscritos: primeiro pela menção (peso), depois pelo status (Apto/Inapto) e, por fim, por ordem alfabética
+    # Ordena os conscritos: primeiro pela menção (peso), depois pelo status (Apto/Inapto) e, por fim, por ordem alfabética
     conscritos_ordenados = sorted(conscritos, key=lambda x: (
         peso_mencao.get(x[1], 0),
         x[5] == "Apto",
@@ -152,21 +161,21 @@ def exibir_conscritos():
 
     colunas = ["Nome", "Menção", "Habilidades", "Quais Habilidades", "Peso da Menção", "Situação"]
 
-    # Exibir a tabela do 1º Pelotão
+    # Exibe a tabela do 1º Pelotão
     st.subheader("1º Pelotão (A a E)")
     pelotao_1_df = pd.DataFrame(pelotao_1, columns=colunas)
     pelotao_1_df['Situação'] = pelotao_1_df['Situação'].apply(lambda x: "Inapto" if "Inapto" in x else "Apto")
     st.table(pelotao_1_df.style.apply(
-        lambda x: ['background-color: lightcoral' if 'Inapto' in v else 'background-color: lightgreen' if 'Apto' in v else '' for v in x], 
+        lambda x: ['background-color: lightcoral' if 'Inapto' in v else 'background-color: lightgreen' if 'Apto' in v else '' for v in x],
         axis=1
     ))
 
-    # Exibir a tabela do 2º Pelotão
+    # Exibe a tabela do 2º Pelotão
     st.subheader("2º Pelotão (F a J)")
     pelotao_2_df = pd.DataFrame(pelotao_2, columns=colunas)
     pelotao_2_df['Situação'] = pelotao_2_df['Situação'].apply(lambda x: "Inapto" if "Inapto" in x else "Apto")
     st.table(pelotao_2_df.style.apply(
-        lambda x: ['background-color: lightcoral' if 'Inapto' in v else 'background-color: lightgreen' if 'Apto' in v else '' for v in x], 
+        lambda x: ['background-color: lightcoral' if 'Inapto' in v else 'background-color: lightgreen' if 'Apto' in v else '' for v in x],
         axis=1
     ))
 
@@ -200,7 +209,7 @@ st.markdown("""
     h1, h2, h3, h4, h5, h6 {
         color: white;
     }
-    .css-ffhzg2 { 
+    .css-ffhzg2 {
         color: white;
     }
     </style>
