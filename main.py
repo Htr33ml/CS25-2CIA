@@ -157,7 +157,6 @@ def reordenar_e_renomear(df):
 def ordenar_e_numerar(df):
     df["sit_status"] = df["Situação Calculada"].map({"Apto": 0, "Inapto": 1})
     df = df.sort_values(by=["sit_status", "ML Score"], ascending=[True, False])
-    # Remove as colunas auxiliares antes de exibir:
     df = df.drop(columns=["ML Score", "sit_status"])
     df = df.reset_index(drop=True)
     df.insert(0, "Ordem", df.index + 1)
@@ -322,7 +321,7 @@ with st.form("form_inserir_novo"):
         else:
             sheet.append_row([novo_nome, "-", "-", "-", "-", "-", "-", "-", "-"])
             st.success(f"Conscrito {novo_nome} inserido com sucesso!")
-            st.experimental_rerun()
+            st.rerun()
 
 # ------------------------------
 # EXIBIÇÃO COMPLETA DOS CONSCRITOS (SEM FILTRO) – NA PÁGINA PRINCIPAL
