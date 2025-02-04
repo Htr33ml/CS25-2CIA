@@ -69,10 +69,10 @@ def login():
             st.session_state['logado'] = True
             data_hora = datetime.now(brasilia_tz).strftime("%Y-%m-%d %H:%M:%S")
             logins_sheet.append_row([usuario, data_hora])
-            st.success(f"Bem-vindo, {usuario}!")
+            st.success(f"✅Bem-vindo, {usuario}!")
             st.rerun()
         else:
-            st.error("Usuário ou senha incorretos. Tente novamente.")
+            st.error("❌Usuário ou senha incorretos. Confira Espaços! Tente novamente.")
 
 if "logado" not in st.session_state or not st.session_state["logado"]:
     login()
@@ -214,7 +214,7 @@ def gerar_relatorio_pelotao(pelotao):
 # ------------------------------
 # MENU LATERAL
 # ------------------------------
-menu_option = st.sidebar.radio("Menu", ["Atualizar Conscrito", "Relatórios"])
+menu_option = st.sidebar.radio("MENU", ["Atualizar Conscrito", "Relatórios"])
 
 if menu_option == "Atualizar Conscrito":
     st.sidebar.markdown("### Selecione o conscrito")
@@ -247,27 +247,27 @@ if menu_option == "Atualizar Conscrito":
     tab_names = ["Saúde", "Teste de Aptidão Física", "Entrevista", "Habilidade", "Contraindicado?", "Equipe de Instrução"]
     tabs = st.tabs(tab_names)
     with tabs[0]:
-        st.subheader("Saúde")
+        st.subheader("⛑️Saúde")
         saude_apto = st.radio("Está apto pela seção de saúde?", ("Sim", "Não"))
         saude_motivo = ""
         if saude_apto == "Não":
             saude_motivo = st.text_input("Qual o motivo?")
-        if st.button("Salvar Saúde", key="salvar_saude"):
+        if st.button("🦅Salvar Saúde🦅", key="salvar_saude"):
             sheet.update(f"B{row_num}:C{row_num}", [[saude_apto, saude_motivo]])
-            st.success("Dados de Saúde atualizados.")
+            st.success("✅Dados de Saúde atualizados.")
     with tabs[1]:
-        st.subheader("Teste de Aptidão Física (TAF)")
+        st.subheader("🏃‍♂️‍➡️Teste de Aptidão Física (TAF)")
         taf = st.radio("Passou no TAF?", ("Sim", "Não"))
-        if st.button("Salvar TAF", key="salvar_taf"):
+        if st.button("🦅Salvar TAF🦅", key="salvar_taf"):
             sheet.update(f"D{row_num}", [[taf]])
-            st.success("Dados do TAF atualizados.")
+            st.success("🦅Dados do TAF atualizados🦅")
     with tabs[2]:
         st.subheader("Entrevista")
         entrevista_mencao = st.selectbox("Menção", ["Excelente", "Muito Bom", "Bom", "Regular", "Insuficiente"])
         entrevista_obs = st.text_area("Observações do entrevistador")
         if st.button("Salvar Entrevista", key="salvar_entrevista"):
             sheet.update(f"E{row_num}:F{row_num}", [[entrevista_mencao, entrevista_obs]])
-            st.success("Dados da Entrevista atualizados.")
+            st.success("🦅Dados da Entrevista atualizados.🦅")
     with tabs[3]:
         st.subheader("Habilidade")
         tem_habilidade = st.radio("Tem alguma habilidade?", ("Sim", "Não"))
@@ -275,24 +275,24 @@ if menu_option == "Atualizar Conscrito":
         if tem_habilidade == "Sim":
             habilidade_text = st.text_input("Quais habilidades?")
         valor_habilidade = habilidade_text if tem_habilidade == "Sim" else "Não"
-        if st.button("Salvar Habilidade", key="salvar_habilidade"):
+        if st.button("🦅Salvar Habilidade🦅", key="salvar_habilidade"):
             sheet.update(f"G{row_num}", [[valor_habilidade]])
             st.success("Dados de Habilidade atualizados.")
     with tabs[4]:
         st.subheader("Contraindicado?")
         contraindicado = st.radio("É contra indicado?", ("Sim", "Não"))
-        if st.button("Salvar Contraindicado?", key="salvar_contra"):
+        if st.button("🦅Salvar Dados?🦅", key="salvar_contra"):
             sheet.update(f"H{row_num}", [[contraindicado]])
             st.success("Dados de Contraindicação atualizados.")
     with tabs[5]:
         st.subheader("Equipe de Instrução")
         instrucao_apto = st.radio("É apto pela equipe de instrução?", ("Sim", "Não"))
         obeso = st.radio("É obeso?", ("Sim", "Não"))
-        if st.button("Salvar Equipe de Instrução", key="salvar_instrucao"):
+        if st.button("🦅Salvar Equipe de Instrução🦅", key="salvar_instrucao"):
             sheet.update(f"I{row_num}:J{row_num}", [[instrucao_apto, obeso]])
             st.success("Dados da Equipe de Instrução atualizados.")
 
-elif menu_option == "Relatórios":
+elif menu_option == "📄Relatórios":
     st.header("Relatórios")
     tab_rel = st.tabs(["Relatório 1º Pelotão", "Relatório 2º Pelotão"])
     with tab_rel[0]:
@@ -321,7 +321,7 @@ with st.form("form_inserir_novo"):
             st.warning("Preencha o nome!")
         else:
             sheet.append_row([novo_nome, "-", "-", "-", "-", "-", "-", "-", "-"])
-            st.success(f"Conscrito {novo_nome} inserido com sucesso!")
+            st.success(f"✅Conscrito {novo_nome} inserido com sucesso!")
             st.experimental_rerun()
 
 # ------------------------------
