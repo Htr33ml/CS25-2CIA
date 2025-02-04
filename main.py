@@ -36,6 +36,13 @@ except gspread.exceptions.WorksheetNotFound:
     sys.exit("Erro: A aba 'Logins' não foi encontrada. Crie-a na planilha.")
 
 # ------------------------------
+# CACHE DOS DADOS DO GOOGLE SHEETS
+# ------------------------------
+@st.cache_data(ttl=60)
+def get_all_sheet_values():
+    return sheet.get_all_values()
+
+# ------------------------------
 # FUNÇÕES DE AUTENTICAÇÃO
 # ------------------------------
 def hash_senha(senha):
@@ -166,7 +173,7 @@ def ordenar_e_numerar(df):
 # FUNÇÕES PARA EXIBIÇÃO DOS CONSCRITOS
 # ------------------------------
 def exibir_conscritose_status(filtro_pelotao=None):
-    all_values = sheet.get_all_values()
+    all_values = get_all_sheet_values()
     if len(all_values) < 2:
         st.info("Nenhum conscrito cadastrado.")
         return
@@ -191,7 +198,7 @@ def exibir_conscritose_status(filtro_pelotao=None):
 # FUNÇÃO PARA GERAR CSV (RELATÓRIO)
 # ------------------------------
 def gerar_relatorio_pelotao(pelotao):
-    all_values = sheet.get_all_values()
+    all_values = get_all_sheet_values()
     if len(all_values) < 2:
         st.info("Nenhum conscrito cadastrado.")
         return None
@@ -217,7 +224,7 @@ menu_option = st.sidebar.radio("Menu", ["Atualizar Conscrito", "Relatórios"])
 
 if menu_option == "Atualizar Conscrito":
     st.sidebar.markdown("### Selecione o conscrito")
-    all_values = sheet.get_all_values()
+    all_values = get_all_sheet_values()
     if len(all_values) < 2:
         st.info("Nenhum conscrito cadastrado.")
         st.stop()
