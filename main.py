@@ -79,10 +79,10 @@ if "logado" not in st.session_state or not st.session_state["logado"]:
     st.stop()
 
 # ------------------------------
-# CABEÇALHO SUPERIOR FIXO (Conteúdo centralizado)
+# CABEÇALHO SUPERIOR FIXO (Imagem, Título e Subtítulo centralizados)
 # ------------------------------
 st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-st.image('IMG_1118.png', width=200)  # Tamanho maior que antes
+st.image('IMG_1118.png', width=200)
 st.markdown('<h1>SELEÇÃO COMPLEMENTAR 2025</h1>', unsafe_allow_html=True)
 st.markdown('<h2>2ª CIA - TIGRE</h2>', unsafe_allow_html=True)
 st.markdown("</div><hr>", unsafe_allow_html=True)
@@ -320,11 +320,21 @@ st.markdown("""
     [data-testid="stSidebar"] * {
         color: white;
     }
+    /* Garante que os inputs na sidebar tenham texto preto */
+    [data-testid="stSidebar"] input {
+        color: black !important;
+        background-color: white !important;
+    }
     /* Rodapé da sidebar com texto preto */
     .sidebar-footer {
         text-align: center;
         font-size: 10px;
         color: black;
+    }
+    /* Garante que áreas de tabs tenham fundo preto */
+    [data-testid="stHorizontalBlock"] {
+        background-color: black !important;
+        color: white !important;
     }
     </style>
 """, unsafe_allow_html=True)
