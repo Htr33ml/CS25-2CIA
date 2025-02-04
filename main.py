@@ -79,13 +79,13 @@ if "logado" not in st.session_state or not st.session_state["logado"]:
     st.stop()
 
 # ------------------------------
-# CABEÇALHO SUPERIOR FIXO
+# CABEÇALHO SUPERIOR FIXO (Conteúdo centralizado)
 # ------------------------------
-with st.container():
-    st.image('IMG_1118.png', width=60)
-    st.markdown('<h1 style="text-align: center;">SELEÇÃO COMPLEMENTAR 2025</h1>', unsafe_allow_html=True)
-    st.markdown('<h2 style="text-align: center;">2ª CIA - TIGRE</h2>', unsafe_allow_html=True)
-    st.markdown("<hr>", unsafe_allow_html=True)
+st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+st.image('IMG_1118.png', width=200)  # Tamanho maior que antes
+st.markdown('<h1>SELEÇÃO COMPLEMENTAR 2025</h1>', unsafe_allow_html=True)
+st.markdown('<h2>2ª CIA - TIGRE</h2>', unsafe_allow_html=True)
+st.markdown("</div><hr>", unsafe_allow_html=True)
 
 # ------------------------------
 # FUNÇÃO PARA CALCULAR A SITUAÇÃO FINAL
@@ -122,12 +122,9 @@ interview_weights = {
 # FUNÇÃO PARA REORDENAR E RENOMEAR COLUNAS (EXIBIÇÃO)
 # ------------------------------
 def reordenar_e_renomear(df):
-    # Renomeia "2ª Seção" para "Contraindicado?" se existir
     if "2ª Seção" in df.columns:
         df = df.rename(columns={"2ª Seção": "Contraindicado?"})
-    # Insere a coluna "Entrevista Peso" logo após "Entrevista_Menção"
     df["Entrevista Peso"] = df["Entrevista_Menção"].apply(lambda x: interview_weights.get(x.strip(), 0))
-    # Calcula a situação
     df["Situação Calculada"] = df.apply(compute_situacao, axis=1)
     nova_ordem = ["Nome", "Saúde_Apto", "Saúde_Motivo", "TAF", "Entrevista_Menção", "Entrevista Peso", "Entrevista_Obs", "Contraindicado?", "Instrução_Apto", "Obeso", "Situação Calculada"]
     df = df[[col for col in nova_ordem if col in df.columns]]
@@ -137,7 +134,6 @@ def reordenar_e_renomear(df):
 # FUNÇÃO PARA ORDENAR E NUMERAR REGISTROS
 # ------------------------------
 def ordenar_e_numerar(df):
-    # Ordena: aptos primeiro (Situação Calculada "Apto") e, dentro deles, por "Entrevista Peso" descrescente
     df["sit_status"] = df["Situação Calculada"].map({"Apto": 0, "Inapto": 1})
     df = df.sort_values(by=["sit_status", "Entrevista Peso"], ascending=[True, False])
     df = df.drop(columns=["sit_status"])
@@ -292,7 +288,6 @@ with st.form("form_inserir_novo"):
         if not novo_nome:
             st.warning("Preencha o nome!")
         else:
-            # Insere com valores padrão ("-") para os demais campos
             sheet.append_row([novo_nome, "-", "-", "-", "-", "-", "-", "-", "-"])
             st.success(f"Conscrito {novo_nome} inserido com sucesso!")
             st.experimental_rerun()
@@ -306,7 +301,7 @@ if menu_option != "Relatórios":
     exibir_conscritose_status()
 
 # ------------------------------
-# CUSTOMIZAÇÃO VISUAL: FUNDO PRETO PARA A INTERFACE E SIDEBAR
+# CUSTOMIZAÇÃO VISUAL: CONTEÚDO PRINCIPAL FUNDO PRETO COM TEXTO BRANCO; SIDEBAR FUNDO CINZA; RODAPÉ NO SIDEBAR COM TEXTO PRETO
 # ------------------------------
 st.markdown("""
     <style>
@@ -317,20 +312,26 @@ st.markdown("""
     h1, h2, h3, h4, h5, h6 {
         color: white;
     }
-    /* Estiliza a sidebar para fundo preto e texto branco */
+    /* Sidebar com fundo cinza e texto branco */
     [data-testid="stSidebar"] {
-        background-color: black;
+        background-color: gray;
         color: white;
     }
     [data-testid="stSidebar"] * {
         color: white;
     }
+    /* Rodapé da sidebar com texto preto */
+    .sidebar-footer {
+        text-align: center;
+        font-size: 10px;
+        color: black;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-    <br>
-    <div style="text-align: center; font-size: 10px; color: gray;">
+st.sidebar.markdown("""
+    <br><br><br>
+    <div class="sidebar-footer">
     Código Python escrito por: CAP TREMMEL - PQDT 90.360<br>
     Qualquer dúvida ou erro do app, entrar em ctt (21) 974407682
     </div>
