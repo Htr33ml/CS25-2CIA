@@ -60,7 +60,7 @@ def login():
             data_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             users_sheet.append_row([usuario, data_hora])
             st.success(f"Bem-vindo, {usuario}!")
-            st.experimental_rerun()
+            st.rerun()  # Substituído st.experimental_rerun() por st.rerun()
         else:
             st.error("Usuário ou senha incorretos. Tente novamente.")
 
@@ -121,7 +121,7 @@ def coletar_dados():
     habilidades_descricao = habilidades_descricao if habilidades > 0 else "-"
 
     # Verificar se o conscrito já foi registrado para evitar duplicações
-    conscritos_existentes = [c[1] for c in st.session_state.conscritos]
+    conscritos_existentes = [c[0] for c in st.session_state.conscritos]
     if nome in conscritos_existentes:
         st.warning(f"O conscrito {nome} já foi registrado.")
         return
