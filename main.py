@@ -88,7 +88,6 @@ def compute_situacao(row):
         return "Inapto"
     if row["TAF"].strip().lower() == "não":
         return "Inapto"
-    # Se a menção for "Insuficiente" (nota 2 – nota de corte igual a 2), é eliminatório
     if row["Entrevista_Menção"].strip().lower() == "insuficiente":
         return "Inapto"
     if row["2ª Seção"].strip().lower() == "sim":
@@ -137,14 +136,13 @@ if menu_option == "Atualizar Conscrito":
     row_num = None
     for i, row in enumerate(data):
         if row[0] == selected_name:
-            row_num = i + 2  # +2: 1 para o cabeçalho e 0-indexado para os dados
+            row_num = i + 2  # +2: 1 para o cabeçalho e i indexado a partir de 0
             break
     if row_num is None:
         st.error("Conscrito não encontrado.")
         st.stop()
 
     st.header(f"Atualizando informações do conscrito: {selected_name}")
-    # Cria abas para cada área de atualização
     tab_names = ["Saúde", "Teste de Aptidão Física", "Entrevista", "2ª Seção", "Equipe de Instrução"]
     tabs = st.tabs(tab_names)
 
@@ -156,7 +154,6 @@ if menu_option == "Atualizar Conscrito":
         if saude_apto == "Não":
             saude_motivo = st.text_input("Qual o motivo?")
         if st.button("Salvar Saúde", key="salvar_saude"):
-            # Atualiza as colunas B e C (Saúde_Apto e Saúde_Motivo)
             sheet.update(f"B{row_num}:C{row_num}", [[saude_apto, saude_motivo]])
             st.success("Dados de Saúde atualizados.")
 
@@ -165,7 +162,6 @@ if menu_option == "Atualizar Conscrito":
         st.subheader("Teste de Aptidão Física (TAF)")
         taf = st.radio("Passou no TAF?", ("Sim", "Não"))
         if st.button("Salvar TAF", key="salvar_taf"):
-            # Atualiza a coluna D (TAF) usando lista de listas
             sheet.update(f"D{row_num}", [[taf]])
             st.success("Dados do TAF atualizados.")
 
@@ -175,7 +171,6 @@ if menu_option == "Atualizar Conscrito":
         entrevista_mencao = st.selectbox("Menção", ["Excelente", "Muito Bom", "Bom", "Regular", "Insuficiente"])
         entrevista_obs = st.text_area("Observações do entrevistador")
         if st.button("Salvar Entrevista", key="salvar_entrevista"):
-            # Atualiza as colunas E e F (Entrevista_Menção e Entrevista_Obs)
             sheet.update(f"E{row_num}:F{row_num}", [[entrevista_mencao, entrevista_obs]])
             st.success("Dados da Entrevista atualizados.")
 
@@ -184,7 +179,6 @@ if menu_option == "Atualizar Conscrito":
         st.subheader("2ª Seção")
         segunda_secao = st.radio("É contra indicado?", ("Sim", "Não"))
         if st.button("Salvar 2ª Seção", key="salvar_2secao"):
-            # Atualiza a coluna G (2ª Seção) com formato de lista de listas
             sheet.update(f"G{row_num}", [[segunda_secao]])
             st.success("Dados da 2ª Seção atualizados.")
 
@@ -194,13 +188,11 @@ if menu_option == "Atualizar Conscrito":
         instrucao_apto = st.radio("É apto pela equipe de instrução?", ("Sim", "Não"))
         obeso = st.radio("É obeso?", ("Sim", "Não"))
         if st.button("Salvar Equipe de Instrução", key="salvar_instrucao"):
-            # Atualiza as colunas H e I (Instrução_Apto e Obeso)
             sheet.update(f"H{row_num}:I{row_num}", [[instrucao_apto, obeso]])
             st.success("Dados da Equipe de Instrução atualizados.")
 
 elif menu_option == "Relatórios":
     st.header("Relatórios")
-    # Função para gerar relatório em CSV com cálculo da situação e ordenação por entrevista
     def gerar_relatorio_pelotao(pelotao):
         all_values = sheet.get_all_values()
         if len(all_values) < 2:
@@ -209,13 +201,13 @@ elif menu_option == "Relatórios":
         headers = all_values[0]
         data = all_values[1:]
         df = pd.DataFrame(data, columns=headers)
-        # O código espera que as colunas estejam nomeadas da seguinte forma:
-        # "Nome", "Saúde_Apto", "Saúde_Motivo", "TAF", "Entrevista_Menção", "Entrevista_Obs", "2ª Seção", "Instrução_Apto", "Obeso"
+        # Verifica se a coluna "Nome" existe
+        if "Nome" not in df.columns:
+            st.error("A coluna 'Nome' não foi encontrada. Verifique o cabeçalho da planilha principal.")
+            return None
         df["Situação Calculada"] = df.apply(compute_situacao, axis=1)
         df["Entrevista Peso"] = df["Entrevista_Menção"].apply(lambda x: interview_weights.get(x.strip(), 0))
-        # Ordena pela nota da entrevista (descendente)
         df = df.sort_values(by="Entrevista Peso", ascending=False)
-        # Filtra por pelotão: por exemplo, pelotão 1 = nomes iniciados com A–E, pelotão 2 = nomes iniciados com F–J
         if pelotao == 1:
             df_filtrado = df[df["Nome"].str[0].str.upper().isin(list("ABCDE"))]
         else:
@@ -234,9 +226,6 @@ elif menu_option == "Relatórios":
         if csv2:
             st.download_button(label="Baixar CSV 2º Pelotão", data=csv2, file_name="relatorio_2pelotao.csv", mime="text/csv")
 
-# ------------------------------
-# EXIBIÇÃO GERAL DOS CONSCRITOS (com situação colorida)
-# ------------------------------
 def exibir_conscritose_status():
     all_values = sheet.get_all_values()
     if len(all_values) < 2:
@@ -248,7 +237,6 @@ def exibir_conscritose_status():
     df["Situação Calculada"] = df.apply(compute_situacao, axis=1)
     df["Entrevista Peso"] = df["Entrevista_Menção"].apply(lambda x: interview_weights.get(x.strip(), 0))
     df = df.sort_values(by="Entrevista Peso", ascending=False)
-    # Função para colorir a coluna "Situação Calculada": vermelho se Inapto, verde se Apto
     def color_sit(value):
         if value == "Inapto":
             return "background-color: red; color: white;"
