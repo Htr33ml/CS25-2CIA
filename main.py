@@ -83,7 +83,7 @@ if "logado" not in st.session_state or not st.session_state["logado"]:
 # FUNÇÃO PARA CALCULAR A SITUAÇÃO FINAL
 # ------------------------------
 def compute_situacao(row):
-    # row é um dicionário com as colunas da planilha
+    # row é um dicionário (ou Series) com as colunas da planilha
     if row["Saúde_Apto"].strip().lower() == "não":
         return "Inapto"
     if row["TAF"].strip().lower() == "não":
@@ -108,125 +108,26 @@ interview_weights = {
 }
 
 # ------------------------------
-# MENU LATERAL: Atualizar Conscrito / Relatórios
+# FUNÇÃO PARA REORDENAR E RENOMEAR COLUNAS NA EXIBIÇÃO
 # ------------------------------
-menu_option = st.sidebar.radio("Menu", ["Atualizar Conscrito", "Relatórios"])
+def reordenar_e_renomear(df):
+    # Renomeia "2ª Seção" para "Contraindicado?"
+    df = df.rename(columns={"2ª Seção": "Contraindicado?"})
+    # Insere a coluna "Entrevista Peso" imediatamente após "Entrevista_Menção"
+    # Primeiro, calculamos o peso com base na menção
+    df["Entrevista Peso"] = df["Entrevista_Menção"].apply(lambda x: interview_weights.get(x.strip(), 0))
+    # Calcula a situação
+    df["Situação Calculada"] = df.apply(compute_situacao, axis=1)
+    # Define a nova ordem de colunas desejada
+    nova_ordem = ["Nome", "Saúde_Apto", "Saúde_Motivo", "TAF", "Entrevista_Menção", "Entrevista Peso", "Entrevista_Obs", "Contraindicado?", "Instrução_Apto", "Obeso", "Situação Calculada"]
+    # Se houver colunas extras (caso a planilha tenha outros campos), mantêm-se apenas os definidos
+    df = df[[col for col in nova_ordem if col in df.columns]]
+    return df
 
-if menu_option == "Atualizar Conscrito":
-    st.sidebar.markdown("### Selecione o conscrito")
-    all_values = sheet.get_all_values()
-    if len(all_values) < 2:
-        st.info("Nenhum conscrito cadastrado.")
-        st.stop()
-    header = all_values[0]
-    data = all_values[1:]
-    # Considera que a coluna A é o Nome
-    names = [row[0] for row in data]
-    search_name = st.sidebar.text_input("Pesquisar conscrito:")
-    if search_name:
-        filtered_names = [name for name in names if search_name.lower() in name.lower()]
-    else:
-        filtered_names = names
-    if filtered_names:
-        selected_name = st.sidebar.selectbox("Selecione o conscrito:", filtered_names)
-    else:
-        st.sidebar.info("Nenhum conscrito encontrado.")
-        st.stop()
-    # Localiza o número da linha do conscrito selecionado (contando com o cabeçalho)
-    row_num = None
-    for i, row in enumerate(data):
-        if row[0] == selected_name:
-            row_num = i + 2  # +2: 1 para o cabeçalho e i indexado a partir de 0
-            break
-    if row_num is None:
-        st.error("Conscrito não encontrado.")
-        st.stop()
-
-    st.header(f"Atualizando informações do conscrito: {selected_name}")
-    tab_names = ["Saúde", "Teste de Aptidão Física", "Entrevista", "2ª Seção", "Equipe de Instrução"]
-    tabs = st.tabs(tab_names)
-
-    # Aba Saúde
-    with tabs[0]:
-        st.subheader("Saúde")
-        saude_apto = st.radio("Está apto pela seção de saúde?", ("Sim", "Não"))
-        saude_motivo = ""
-        if saude_apto == "Não":
-            saude_motivo = st.text_input("Qual o motivo?")
-        if st.button("Salvar Saúde", key="salvar_saude"):
-            sheet.update(f"B{row_num}:C{row_num}", [[saude_apto, saude_motivo]])
-            st.success("Dados de Saúde atualizados.")
-
-    # Aba TAF
-    with tabs[1]:
-        st.subheader("Teste de Aptidão Física (TAF)")
-        taf = st.radio("Passou no TAF?", ("Sim", "Não"))
-        if st.button("Salvar TAF", key="salvar_taf"):
-            sheet.update(f"D{row_num}", [[taf]])
-            st.success("Dados do TAF atualizados.")
-
-    # Aba Entrevista
-    with tabs[2]:
-        st.subheader("Entrevista")
-        entrevista_mencao = st.selectbox("Menção", ["Excelente", "Muito Bom", "Bom", "Regular", "Insuficiente"])
-        entrevista_obs = st.text_area("Observações do entrevistador")
-        if st.button("Salvar Entrevista", key="salvar_entrevista"):
-            sheet.update(f"E{row_num}:F{row_num}", [[entrevista_mencao, entrevista_obs]])
-            st.success("Dados da Entrevista atualizados.")
-
-    # Aba 2ª Seção
-    with tabs[3]:
-        st.subheader("2ª Seção")
-        segunda_secao = st.radio("É contra indicado?", ("Sim", "Não"))
-        if st.button("Salvar 2ª Seção", key="salvar_2secao"):
-            sheet.update(f"G{row_num}", [[segunda_secao]])
-            st.success("Dados da 2ª Seção atualizados.")
-
-    # Aba Equipe de Instrução
-    with tabs[4]:
-        st.subheader("Equipe de Instrução")
-        instrucao_apto = st.radio("É apto pela equipe de instrução?", ("Sim", "Não"))
-        obeso = st.radio("É obeso?", ("Sim", "Não"))
-        if st.button("Salvar Equipe de Instrução", key="salvar_instrucao"):
-            sheet.update(f"H{row_num}:I{row_num}", [[instrucao_apto, obeso]])
-            st.success("Dados da Equipe de Instrução atualizados.")
-
-elif menu_option == "Relatórios":
-    st.header("Relatórios")
-    def gerar_relatorio_pelotao(pelotao):
-        all_values = sheet.get_all_values()
-        if len(all_values) < 2:
-            st.info("Nenhum conscrito cadastrado.")
-            return None
-        headers = all_values[0]
-        data = all_values[1:]
-        df = pd.DataFrame(data, columns=headers)
-        # Verifica se a coluna "Nome" existe
-        if "Nome" not in df.columns:
-            st.error("A coluna 'Nome' não foi encontrada. Verifique o cabeçalho da planilha principal.")
-            return None
-        df["Situação Calculada"] = df.apply(compute_situacao, axis=1)
-        df["Entrevista Peso"] = df["Entrevista_Menção"].apply(lambda x: interview_weights.get(x.strip(), 0))
-        df = df.sort_values(by="Entrevista Peso", ascending=False)
-        if pelotao == 1:
-            df_filtrado = df[df["Nome"].str[0].str.upper().isin(list("ABCDE"))]
-        else:
-            df_filtrado = df[df["Nome"].str[0].str.upper().isin(list("FGHIJ"))]
-        return df_filtrado.to_csv(index=False).encode('utf-8')
-    
-    tab_rel = st.tabs(["Relatório 1º Pelotão", "Relatório 2º Pelotão"])
-    with tab_rel[0]:
-        st.subheader("Relatório 1º Pelotão")
-        csv1 = gerar_relatorio_pelotao(1)
-        if csv1:
-            st.download_button(label="Baixar CSV 1º Pelotão", data=csv1, file_name="relatorio_1pelotao.csv", mime="text/csv")
-    with tab_rel[1]:
-        st.subheader("Relatório 2º Pelotão")
-        csv2 = gerar_relatorio_pelotao(2)
-        if csv2:
-            st.download_button(label="Baixar CSV 2º Pelotão", data=csv2, file_name="relatorio_2pelotao.csv", mime="text/csv")
-
-def exibir_conscritose_status():
+# ------------------------------
+# FUNÇÕES PARA EXIBIÇÃO DOS CONSCRITOS
+# ------------------------------
+def exibir_conscritose_status(filtro_pelotao=None):
     all_values = sheet.get_all_values()
     if len(all_values) < 2:
         st.info("Nenhum conscrito cadastrado.")
@@ -234,9 +135,13 @@ def exibir_conscritose_status():
     headers = all_values[0]
     data = all_values[1:]
     df = pd.DataFrame(data, columns=headers)
-    df["Situação Calculada"] = df.apply(compute_situacao, axis=1)
-    df["Entrevista Peso"] = df["Entrevista_Menção"].apply(lambda x: interview_weights.get(x.strip(), 0))
-    df = df.sort_values(by="Entrevista Peso", ascending=False)
+    df = reordenar_e_renomear(df)
+    # Se for solicitado filtrar por pelotão (pelotao=1 ou 2), filtra pelo primeiro caractere do nome
+    if filtro_pelotao == 1:
+        df = df[df["Nome"].str[0].str.upper().isin(list("ABCDE"))]
+    elif filtro_pelotao == 2:
+        df = df[df["Nome"].str[0].str.upper().isin(list("FGHIJ"))]
+    # Função para colorir a coluna "Situação Calculada"
     def color_sit(value):
         if value == "Inapto":
             return "background-color: red; color: white;"
@@ -245,9 +150,185 @@ def exibir_conscritose_status():
     styled_df = df.style.applymap(color_sit, subset=["Situação Calculada"])
     st.dataframe(styled_df)
 
-st.markdown("---")
-st.subheader("Visualização Completa dos Conscritos")
-exibir_conscritose_status()
+# ------------------------------
+# FUNÇÃO PARA GERAR CSV (RELATÓRIO) COM COLUNAS REORDENADAS
+# ------------------------------
+def gerar_relatorio_pelotao(pelotao):
+    all_values = sheet.get_all_values()
+    if len(all_values) < 2:
+        st.info("Nenhum conscrito cadastrado.")
+        return None
+    headers = all_values[0]
+    data = all_values[1:]
+    df = pd.DataFrame(data, columns=headers)
+    if "Nome" not in df.columns:
+        st.error("A coluna 'Nome' não foi encontrada. Verifique o cabeçalho da planilha principal.")
+        return None
+    df = reordenar_e_renomear(df)
+    # Filtra por pelotão: 1 = A–E, 2 = F–J
+    if pelotao == 1:
+        df_filtrado = df[df["Nome"].str[0].str.upper().isin(list("ABCDE"))]
+    else:
+        df_filtrado = df[df["Nome"].str[0].str.upper().isin(list("FGHIJ"))]
+    # Retorna o CSV com índice falso
+    return df_filtrado.to_csv(index=False).encode('utf-8')
+
+# ------------------------------
+# MENU LATERAL: Atualizar Conscrito / Relatórios
+# ------------------------------
+menu_option = st.sidebar.radio("Menu", ["Atualizar Conscrito", "Relatórios"])
+
+if menu_option == "Atualizar Conscrito":
+    # Adiciona uma opção para selecionar entre atualizar um conscrito existente ou inserir um novo
+    update_option = st.sidebar.radio("Operação", ["Atualizar Conscrito Existente", "Inserir Novo Conscrito"])
+    
+    if update_option == "Inserir Novo Conscrito":
+        st.header("Inserir Novo Conscrito")
+        with st.form("form_novo_conscripto"):
+            nome = st.text_input("Nome do conscrito:")
+            st.markdown("#### Saúde")
+            saude_apto = st.radio("Está apto pela seção de saúde?", ("Sim", "Não"))
+            saude_motivo = ""
+            if saude_apto == "Não":
+                saude_motivo = st.text_input("Qual o motivo?")
+            st.markdown("#### Teste de Aptidão Física (TAF)")
+            taf = st.radio("Passou no TAF?", ("Sim", "Não"))
+            st.markdown("#### Entrevista")
+            entrevista_mencao = st.selectbox("Menção", ["Excelente", "Muito Bom", "Bom", "Regular", "Insuficiente"])
+            entrevista_obs = st.text_area("Observações do entrevistador")
+            st.markdown("#### Contraindicado?")
+            contraindicado = st.radio("É contra indicado?", ("Sim", "Não"))
+            st.markdown("#### Equipe de Instrução")
+            instrucao_apto = st.radio("É apto pela equipe de instrução?", ("Sim", "Não"))
+            obeso = st.radio("É obeso?", ("Sim", "Não"))
+            submitted = st.form_submit_button("Inserir Conscrito")
+            if submitted:
+                if not nome:
+                    st.warning("Preencha o nome do conscrito!")
+                else:
+                    # Insere a nova linha com as colunas na ordem:
+                    # Nome, Saúde_Apto, Saúde_Motivo, TAF, Entrevista_Menção, Entrevista_Obs, 2ª Seção, Instrução_Apto, Obeso
+                    sheet.append_row([nome, saude_apto, saude_motivo, taf, entrevista_mencao, entrevista_obs, contraindicado, instrucao_apto, obeso])
+                    st.success(f"Conscrito {nome} inserido com sucesso!")
+                    st.experimental_rerun()
+    
+    else:  # Atualizar Conscrito Existente
+        st.header("Atualizar Conscrito Existente")
+        all_values = sheet.get_all_values()
+        if len(all_values) < 2:
+            st.info("Nenhum conscrito cadastrado.")
+            st.stop()
+        header = all_values[0]
+        data = all_values[1:]
+        # Considera que a coluna A é o Nome
+        names = [row[0] for row in data]
+        search_name = st.sidebar.text_input("Pesquisar conscrito:")
+        if search_name:
+            filtered_names = [name for name in names if search_name.lower() in name.lower()]
+        else:
+            filtered_names = names
+        if filtered_names:
+            selected_name = st.sidebar.selectbox("Selecione o conscrito:", filtered_names)
+        else:
+            st.sidebar.info("Nenhum conscrito encontrado.")
+            st.stop()
+        # Localiza a linha (contando com o cabeçalho)
+        row_num = None
+        for i, row in enumerate(data):
+            if row[0] == selected_name:
+                row_num = i + 2
+                break
+        if row_num is None:
+            st.error("Conscrito não encontrado.")
+            st.stop()
+        st.header(f"Atualizando informações do conscrito: {selected_name}")
+        tab_names = ["Saúde", "Teste de Aptidão Física", "Entrevista", "Contraindicado?", "Equipe de Instrução"]
+        tabs = st.tabs(tab_names)
+        # Aba Saúde
+        with tabs[0]:
+            st.subheader("Saúde")
+            saude_apto = st.radio("Está apto pela seção de saúde?", ("Sim", "Não"))
+            saude_motivo = ""
+            if saude_apto == "Não":
+                saude_motivo = st.text_input("Qual o motivo?")
+            if st.button("Salvar Saúde", key="salvar_saude"):
+                sheet.update(f"B{row_num}:C{row_num}", [[saude_apto, saude_motivo]])
+                st.success("Dados de Saúde atualizados.")
+        # Aba TAF
+        with tabs[1]:
+            st.subheader("Teste de Aptidão Física (TAF)")
+            taf = st.radio("Passou no TAF?", ("Sim", "Não"))
+            if st.button("Salvar TAF", key="salvar_taf"):
+                sheet.update(f"D{row_num}", [[taf]])
+                st.success("Dados do TAF atualizados.")
+        # Aba Entrevista
+        with tabs[2]:
+            st.subheader("Entrevista")
+            entrevista_mencao = st.selectbox("Menção", ["Excelente", "Muito Bom", "Bom", "Regular", "Insuficiente"])
+            entrevista_obs = st.text_area("Observações do entrevistador")
+            if st.button("Salvar Entrevista", key="salvar_entrevista"):
+                sheet.update(f"E{row_num}:F{row_num}", [[entrevista_mencao, entrevista_obs]])
+                st.success("Dados da Entrevista atualizados.")
+        # Aba Contraindicado? (antiga 2ª Seção)
+        with tabs[3]:
+            st.subheader("Contraindicado?")
+            contraindicado = st.radio("É contra indicado?", ("Sim", "Não"))
+            if st.button("Salvar Contraindicado?", key="salvar_2secao"):
+                sheet.update(f"G{row_num}", [[contraindicado]])
+                st.success("Dados de Contraindicação atualizados.")
+        # Aba Equipe de Instrução
+        with tabs[4]:
+            st.subheader("Equipe de Instrução")
+            instrucao_apto = st.radio("É apto pela equipe de instrução?", ("Sim", "Não"))
+            obeso = st.radio("É obeso?", ("Sim", "Não"))
+            if st.button("Salvar Equipe de Instrução", key="salvar_instrucao"):
+                sheet.update(f"H{row_num}:I{row_num}", [[instrucao_apto, obeso]])
+                st.success("Dados da Equipe de Instrução atualizados.")
+
+elif menu_option == "Relatórios":
+    st.header("Relatórios")
+    # Cria duas abas para os relatórios
+    tab_rel = st.tabs(["Relatório 1º Pelotão", "Relatório 2º Pelotão"])
+    # Função para gerar o CSV já reordenado
+    def gerar_relatorio_pelotao_csv(pelotao):
+        all_values = sheet.get_all_values()
+        if len(all_values) < 2:
+            st.info("Nenhum conscrito cadastrado.")
+            return None
+        headers = all_values[0]
+        data = all_values[1:]
+        df = pd.DataFrame(data, columns=headers)
+        if "Nome" not in df.columns:
+            st.error("A coluna 'Nome' não foi encontrada. Verifique o cabeçalho da planilha principal.")
+            return None
+        df = reordenar_e_renomear(df)
+        if pelotao == 1:
+            df_filtrado = df[df["Nome"].str[0].str.upper().isin(list("ABCDE"))]
+        else:
+            df_filtrado = df[df["Nome"].str[0].str.upper().isin(list("FGHIJ"))]
+        return df_filtrado.to_csv(index=False).encode('utf-8')
+    
+    # Em cada aba de relatório, exibe também a visualização completa filtrada
+    with tab_rel[0]:
+        st.subheader("Relatório 1º Pelotão")
+        exibir_conscritose_status(filtro_pelotao=1)
+        csv1 = gerar_relatorio_pelotao_csv(1)
+        if csv1:
+            st.download_button(label="Baixar CSV 1º Pelotão", data=csv1, file_name="relatorio_1pelotao.csv", mime="text/csv")
+    with tab_rel[1]:
+        st.subheader("Relatório 2º Pelotão")
+        exibir_conscritose_status(filtro_pelotao=2)
+        csv2 = gerar_relatorio_pelotao_csv(2)
+        if csv2:
+            st.download_button(label="Baixar CSV 2º Pelotão", data=csv2, file_name="relatorio_2pelotao.csv", mime="text/csv")
+
+# ------------------------------
+# EXIBIÇÃO COMPLETA DOS CONSCRITOS (SEM FILTRO) – APENAS NA PÁGINA PRINCIPAL
+# ------------------------------
+if menu_option != "Relatórios":
+    st.markdown("---")
+    st.subheader("Visualização Completa dos Conscritos")
+    exibir_conscritose_status()
 
 # ------------------------------
 # CUSTOMIZAÇÃO VISUAL E CRÉDITOS
