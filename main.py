@@ -79,7 +79,7 @@ if "logado" not in st.session_state or not st.session_state["logado"]:
     st.stop()
 
 # ------------------------------
-# CABEÇALHO SUPERIOR FIXO (Imagem, Título e Subtítulo centralizados)
+# CABEÇALHO SUPERIOR FIXO (Imagem, Título e Subtítulo Centralizados)
 # ------------------------------
 st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
 st.image('IMG_1118.png', width=200)
@@ -88,35 +88,26 @@ st.markdown('<h2>2ª CIA - TIGRE</h2>', unsafe_allow_html=True)
 st.markdown("</div><hr>", unsafe_allow_html=True)
 
 # ------------------------------
-# FUNÇÃO PARA CALCULAR A SITUAÇÃO FINAL
+# FUNÇÃO AUXILIAR: Converter "Sim"/"Não" em 1/0
 # ------------------------------
-def compute_situacao(row):
-    # Tenta obter o valor da coluna "Contraindicado?" (após renomeação) ou, se não existir, "2ª Seção"
-    contraindicado = row.get("Contraindicado?")
-    if contraindicado is None:
-        contraindicado = row.get("2ª Seção", "")
-    if row["Saúde_Apto"].strip().lower() == "não":
-        return "Inapto"
-    if row["TAF"].strip().lower() == "não":
-        return "Inapto"
-    if row["Entrevista_Menção"].strip().lower() == "insuficiente":
-        return "Inapto"
-    if contraindicado.strip().lower() == "sim":
-        return "Inapto"
-    if row["Instrução_Apto"].strip().lower() == "não":
-        return "Inapto"
-    if row["Obeso"].strip().lower() == "sim":
-        return "Inapto"
-    return "Apto"
+def conv(x):
+    return 1 if x.strip().lower() == "sim" else 0
 
-# Dicionário para o peso da entrevista
-interview_weights = {
-    "Excelente": 10,
-    "Muito Bom": 8,
-    "Bom": 6,
-    "Regular": 4,
-    "Insuficiente": 2
-}
+# ------------------------------
+# FUNÇÃO DE MACHINE LEARNING SIMPLES: COMPUTA ML SCORE
+# ------------------------------
+def compute_ml_score(row):
+    # Utiliza os valores das colunas relevantes para calcular uma pontuação
+    iw = interview_weights.get(row["Entrevista_Menção"].strip(), 0)
+    taf = conv(row["TAF"])
+    saude = conv(row["Saúde_Apto"])
+    instrucao = conv(row["Instrução_Apto"])
+    # Para Contraindicado?, assumimos que "Não" é 1 e "Sim" é 0
+    contra = 1 - conv(row.get("Contraindicado?", row.get("2ª Seção", "")))
+    obeso = 1 - conv(row["Obeso"])
+    # A ML Score é a soma ponderada (os pesos podem ser ajustados)
+    score = iw * 1.0 + taf * 0.5 + saude * 0.5 + instrucao * 0.5 + contra * 0.5 + obeso * 0.5
+    return score
 
 # ------------------------------
 # FUNÇÃO PARA REORDENAR E RENOMEAR COLUNAS (EXIBIÇÃO)
@@ -126,7 +117,9 @@ def reordenar_e_renomear(df):
         df = df.rename(columns={"2ª Seção": "Contraindicado?"})
     df["Entrevista Peso"] = df["Entrevista_Menção"].apply(lambda x: interview_weights.get(x.strip(), 0))
     df["Situação Calculada"] = df.apply(compute_situacao, axis=1)
-    nova_ordem = ["Nome", "Saúde_Apto", "Saúde_Motivo", "TAF", "Entrevista_Menção", "Entrevista Peso", "Entrevista_Obs", "Contraindicado?", "Instrução_Apto", "Obeso", "Situação Calculada"]
+    # Adiciona a coluna ML Score
+    df["ML Score"] = df.apply(compute_ml_score, axis=1)
+    nova_ordem = ["Nome", "Saúde_Apto", "Saúde_Motivo", "TAF", "Entrevista_Menção", "Entrevista Peso", "ML Score", "Entrevista_Obs", "Contraindicado?", "Instrução_Apto", "Obeso", "Situação Calculada"]
     df = df[[col for col in nova_ordem if col in df.columns]]
     return df
 
@@ -135,7 +128,8 @@ def reordenar_e_renomear(df):
 # ------------------------------
 def ordenar_e_numerar(df):
     df["sit_status"] = df["Situação Calculada"].map({"Apto": 0, "Inapto": 1})
-    df = df.sort_values(by=["sit_status", "Entrevista Peso"], ascending=[True, False])
+    # Ordena primeiro por situação (Apto antes de Inapto) e, dentro de cada grupo, por ML Score (descendente)
+    df = df.sort_values(by=["sit_status", "ML Score"], ascending=[True, False])
     df = df.drop(columns=["sit_status"])
     df = df.reset_index(drop=True)
     df.insert(0, "Ordem", df.index + 1)
@@ -203,7 +197,7 @@ if menu_option == "Atualizar Conscrito":
     header = all_values[0]
     data = all_values[1:]
     names = [row[0] for row in data]
-    search_name = st.sidebar.text_input("Pesquisar conscrito:")
+    search_name = st.sidebar.text_input("Pesquisar conscrito:")  # Texto dos inputs será preto, conforme CSS
     if search_name:
         filtered_names = [name for name in names if search_name.lower() in name.lower()]
     else:
